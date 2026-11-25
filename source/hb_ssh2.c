@@ -7,7 +7,7 @@
 
 #include "hb_ssh2.h"
 
-#define  BUFFSIZE   8192
+#define  BUFFSIZE   32768
 
 static short int iSsh2Init = 0;
 static int( *pCallback )( HB_SSH2_SESSION * ) = NULL;
@@ -473,7 +473,7 @@ int hb_ssh2_SftpMkDir( HB_SSH2_SESSION * pSess, const char *sftppath, long lMode
 }
 
 int hb_ssh2_SftpReadDir( HB_SSH2_SFTP_HANDLE * pHandle, char *cName, int iLen,
-      unsigned long *pSize, unsigned long *pTime, unsigned long *pAttrs )
+      libssh2_uint64_t *pSize, unsigned long *pTime, unsigned long *pAttrs )
 {
    LIBSSH2_SFTP_ATTRIBUTES attrs;
    int rc;
@@ -497,7 +497,7 @@ int hb_ssh2_SftpReadDir( HB_SSH2_SFTP_HANDLE * pHandle, char *cName, int iLen,
    return rc;
 }
 
-int hb_ssh2_SftpRead( HB_SSH2_SFTP_HANDLE * pHandle, char *buffer, int nBufferLen )
+int hb_ssh2_SftpRead( HB_SSH2_SFTP_HANDLE * pHandle, char *buffer, int iBufferLen )
 {
 
    int iBytesRead = 0;
@@ -506,7 +506,7 @@ int hb_ssh2_SftpRead( HB_SSH2_SFTP_HANDLE * pHandle, char *buffer, int nBufferLe
    pHandle->pSess->iInfo = 56;
    do
    {
-      rc = libssh2_sftp_read( pHandle->sftp_handle, buffer+iBytesRead, BUFFSIZE-iBytesRead );
+      rc = libssh2_sftp_read( pHandle->sftp_handle, buffer+iBytesRead, iBufferLen-iBytesRead );
 
       if( rc > 0 )
          iBytesRead += rc;
@@ -519,7 +519,7 @@ int hb_ssh2_SftpRead( HB_SSH2_SFTP_HANDLE * pHandle, char *buffer, int nBufferLe
          }
    }
    while( ( pHandle->pSess->iNonBlocking && rc == LIBSSH2_ERROR_EAGAIN ) ||
-      ( rc > 0 && iBytesRead < BUFFSIZE ) );
+      ( rc > 0 && iBytesRead < iBufferLen ) );
 
    pHandle->pSess->iRes = ( rc < 0 )? -1 : 0;
    pHandle->pSess->iErr = libssh2_sftp_last_error( pHandle->pSess->sftp_session );
@@ -760,7 +760,7 @@ HB_FUNC( SSH2_SFTP_MKDIR )
 HB_FUNC( SSH2_SFTP_READDIR )
 {
    char mem[512];
-   unsigned long ulSize;
+   libssh2_uint64_t ulSize;
    unsigned long ulTime;
    unsigned long ulAttrs;
    int rc = hb_ssh2_SftpReadDir( ( HB_SSH2_SFTP_HANDLE * ) hb_parptr( 1 ), mem,
@@ -769,7 +769,7 @@ HB_FUNC( SSH2_SFTP_READDIR )
 
    if( rc > 0 )
    {
-      hb_stornl( ulSize, 2 );
+      hb_stornint( ulSize, 2 );
       hb_stortdt( ulTime / 86400 + 2440588, ( ulTime % 86400 ) * 1000, 3 );
       hb_stornl( ulAttrs, 4 );
       hb_retc( mem );
@@ -871,7 +871,7 @@ HB_FUNC( SSH2_SFTP_STAT )
    if( rc == 0 )
    {
       if( hb_pcount() > 2 )
-         hb_stornl( attrs.filesize, 3 );
+         hb_stornint( attrs.filesize, 3 );
       if( hb_pcount() > 3 )
          //hb_stornl( attrs.mtime, 4 );
          hb_stortdt( attrs.mtime / 86400 + 2440588, ( attrs.mtime % 86400 ) * 1000, 4 );
@@ -899,7 +899,7 @@ HB_FUNC( SSH2_SFTP_FSTAT )
    if( rc == 0 )
    {
       if( hb_pcount() > 1 )
-         hb_stornl( attrs.filesize, 2 );
+         hb_stornint( attrs.filesize, 2 );
       if( hb_pcount() > 2 )
          //hb_stornl( attrs.mtime, 4 );
          hb_stortdt( attrs.mtime / 86400 + 2440588, ( attrs.mtime % 86400 ) * 1000, 3 );
